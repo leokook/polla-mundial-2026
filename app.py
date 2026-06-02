@@ -2,20 +2,19 @@ import streamlit as st
 import sqlite3
 from datetime import datetime, timedelta
 import pandas as pd
-from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# Configuración de página
-st.set_page_config(page_title="Polla Mundial 2026", page_icon="🏆", layout="centered")
+# Page configuration
+st.set_page_config(page_title="World Cup 2026 Pool", page_icon="🏆", layout="centered")
 
-# --- CONEXIÓN A GOOGLE SHEETS (Para guardar) ---
+# --- GOOGLE SHEETS CONNECTION ---
 conn_sheets = st.connection("gsheets", type=GSheetsConnection)
 
-# --- CONEXIÓN A SQLITE LOCAL (Para leer partidos) ---
+# --- SQLITE LOCAL CONNECTION (To read matches) ---
 def get_matches_db():
     conn = sqlite3.connect('worldcup2026.db')
     query = '''
-        SELECT m.id, m.kickoff_at, t1.team_name as local, t2.team_name as visita 
+        SELECT m.id, m.kickoff_at, t1.team_name as home, t2.team_name as away 
         FROM matches m
         JOIN teams t1 ON m.home_team_id = t1.id
         JOIN teams t2 ON m.away_team_id = t2.id
@@ -26,25 +25,30 @@ def get_matches_db():
     conn.close()
     return df
 
-# Menú lateral
-st.sidebar.title("🏆 Polla Oficina 2026")
-pagina = st.sidebar.radio("Navegación", ["Ingresar Predicciones", "Tabla de Posiciones"])
+# Sidebar menu
+st.sidebar.title("🏆 Office Pool 2026")
+pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard"])
 
-# --- PÁGINA 1: INGRESO DE DATOS ---
-if pagina == "Ingresar Predicciones":
-    st.title("⚽ Ingresa o Modifica tus Pronósticos")
+# --- PAGE 1: ENTER PREDICTIONS ---
+if pagina == "Enter Predictions":
+    st.title("⚽ Enter or Edit Your Predictions")
     
-    usuarios = ["Selecciona tu nombre...", "Ana", "Carlos", "Diana", "Juan"]
-    usuario_actual = st.selectbox("¿Quién eres?", usuarios)
-
-    if usuario_actual != "Selecciona tu nombre...":
-        st.write("---")
-        st.info("💡 Puedes modificar tus resultados hasta 1 minuto antes del inicio del partido.")
+    # DYNAMIC USER MANAGEMENT: Read from Google Sheets
+    try:
+        df_users = conn_sheets.read(worksheet="users", ttl=10)
+        lista_usuarios = ["Select your name..."] + df_users['user_name'].dropna().tolist()
+    except:
+        lista_usuarios = ["Select your name...", "Admin: Create 'users' tab in Sheets"]
         
-        # Cargar predicciones existentes desde Google Sheets
+    usuario_actual = st.selectbox("Who are you?", lista_usuarios)
+
+    if usuario_actual != "Select your name...":
+        st.write("---")
+        st.info("💡 You can edit your predictions up to 1 minute before kickoff.")
+        
+        # Load existing predictions to check for previous votes
         try:
             predicciones_existentes = conn_sheets.read(ttl=5)
-            # Aseguramos que el match_id se lea como texto para evitar errores de comparación
             predicciones_existentes['match_id'] = predicciones_existentes['match_id'].astype(str) 
         except:
             predicciones_existentes = pd.DataFrame(columns=["usuario", "match_id", "goles_local", "goles_visita", "fecha_ingreso"])
@@ -53,22 +57,22 @@ if pagina == "Ingresar Predicciones":
         
         for index, row in df_partidos.iterrows():
             match_id = str(row['id'])
-            equipo_local = row['local']
-            equipo_visita = row['visita']
+            equipo_local = row['home']
+            equipo_visita = row['away']
             fecha_str = row['kickoff_at'][:19]
             fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
             
-            # 1. EL NUEVO CANDADO DE TIEMPO (1 minuto antes)
+            # 1. TIME LOCK (1 minute before kickoff)
             limite_modificacion = fecha_partido - timedelta(minutes=1)
             
             if datetime.now() > limite_modificacion:
-                st.warning(f"🔒 {equipo_local} vs {equipo_visita} - Partido bloqueado")
-                continue # Salta al siguiente partido, este ya no se puede editar
+                st.warning(f"🔒 {equipo_local} vs {equipo_visita} - Match locked")
+                continue # Skip to next match
             
-            # 2. BUSCAR SI YA HABÍA VOTADO PARA MOSTRAR SUS NÚMEROS
+            # 2. CHECK IF USER ALREADY VOTED TO LOAD PREVIOUS NUMBERS
             goles_l_previo = 0
             goles_v_previo = 0
-            texto_boton = "Guardar Pronóstico"
+            texto_boton = "Save Prediction"
             
             if not predicciones_existentes.empty:
                 voto_previo = predicciones_existentes[
@@ -79,26 +83,26 @@ if pagina == "Ingresar Predicciones":
                 if not voto_previo.empty:
                     goles_l_previo = int(voto_previo['goles_local'].values[0])
                     goles_v_previo = int(voto_previo['goles_visita'].values[0])
-                    texto_boton = "Actualizar Pronóstico"
-                    st.success(f"✏️ Ya tienes un pronóstico guardado para este partido, pero puedes cambiarlo.")
+                    texto_boton = "Update Prediction"
+                    st.success(f"✏️ You already have a prediction saved for this match, but you can change it.")
 
-            # Mostrar el formulario
+            # Display the form
             with st.form(key=f"form_{match_id}"):
-                st.write(f"📅 Inicio: **{fecha_str}**")
+                st.write(f"📅 Kickoff: **{fecha_str}**")
                 col1, col2, col3 = st.columns([2, 1, 2])
                 with col1:
                     st.write(f"**{equipo_local}**")
-                    goles_l = st.number_input("Goles", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
+                    goles_l = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
                 with col2:
                     st.write("VS")
                 with col3:
                     st.write(f"**{equipo_visita}**")
-                    goles_v = st.number_input("Goles", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
+                    goles_v = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
                 
                 submit = st.form_submit_button(texto_boton)
                 
                 if submit:
-                    # Crear nueva fila con los datos actualizados
+                    # Create new row with updated data
                     nueva_fila = pd.DataFrame([{
                         "usuario": usuario_actual,
                         "match_id": match_id,
@@ -107,7 +111,7 @@ if pagina == "Ingresar Predicciones":
                         "fecha_ingreso": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }])
                     
-                    # Si ya existía un voto, lo borramos de la tabla antes de meter el nuevo
+                    # If vote existed, delete it before appending the new one
                     if not predicciones_existentes.empty:
                         df_limpio = predicciones_existentes[
                             ~((predicciones_existentes['usuario'] == usuario_actual) & 
@@ -117,42 +121,41 @@ if pagina == "Ingresar Predicciones":
                     else:
                         df_actualizado = nueva_fila
 
-                    # Subir la tabla corregida a Google Sheets
+                    # Upload corrected table to Google Sheets
                     conn_sheets.update(data=df_actualizado)
-                    st.success("¡Pronóstico guardado exitosamente! Recargando...")
+                    st.success("Prediction saved successfully! Reloading...")
                     st.rerun()
 
-# --- PÁGINA 2: DASHBOARD ---
-# --- PÁGINA 2: DASHBOARD (TABLA DE POSICIONES) ---
-elif pagina == "Tabla de Posiciones":
-    st.title("📊 Leaderboard Oficial")
-    st.write("Los puntos se calculan automáticamente aplicando las reglas y multiplicadores por fase.")
+# --- PAGE 2: LEADERBOARD ---
+elif pagina == "Leaderboard":
+    st.title("📊 Official Leaderboard")
+    st.write("Points are calculated automatically based on the rules and stage multipliers.")
     
-    # 1. Traer predicciones de los usuarios (lee la primera pestaña por defecto)
+    # 1. Fetch user predictions
     try:
         df_votos = conn_sheets.read(ttl=10)
     except:
         df_votos = pd.DataFrame()
         
-    # 2. Traer resultados reales oficiales (lee la pestaña que acabas de crear)
+    # 2. Fetch real official results
     try:
         df_resultados = conn_sheets.read(worksheet="resultados_reales", ttl=10)
     except:
         df_resultados = pd.DataFrame(columns=["match_id", "goles_local_real", "goles_visita_real"])
 
-    # Verificamos que existan datos en ambas tablas para empezar a calcular
+    # Verify both tables have data to calculate
     if not df_votos.empty and not df_resultados.empty and 'match_id' in df_resultados.columns:
         
-        # Limpiar datos para evitar errores si Google Sheets los lee como texto
+        # Clean data to avoid type mismatches
         df_votos['match_id'] = df_votos['match_id'].astype(str)
-        df_resultados = df_resultados.dropna(subset=['match_id']) # Quitar filas vacías
+        df_resultados = df_resultados.dropna(subset=['match_id'])
         df_resultados['match_id'] = df_resultados['match_id'].astype(float).astype(int).astype(str)
         
-        # Unir lo que votó la gente con los resultados reales
+        # Merge votes with real results
         df_completo = pd.merge(df_votos, df_resultados, on="match_id", how="inner")
         
         if not df_completo.empty:
-            # 3. Traer los stage_id de la base de datos local para saber qué fase es
+            # 3. Fetch stage_id from local DB
             conn = sqlite3.connect('worldcup2026.db')
             df_partidos = pd.read_sql_query("SELECT id as match_id, stage_id FROM matches", conn)
             conn.close()
@@ -160,7 +163,7 @@ elif pagina == "Tabla de Posiciones":
             df_partidos['match_id'] = df_partidos['match_id'].astype(str)
             df_completo = pd.merge(df_completo, df_partidos, on="match_id", how="left")
             
-            # 4. LÓGICA DE PUNTOS PERSONALIZADA
+            # 4. CUSTOM POINTS LOGIC
             def calcular_puntos(row):
                 pred_l = int(row['goles_local'])
                 pred_v = int(row['goles_visita'])
@@ -172,52 +175,52 @@ elif pagina == "Tabla de Posiciones":
                 diff_pred = pred_l - pred_v
                 diff_real = real_l - real_v
                 
-                # A. Marcador Exacto (Pleno)
+                # A. Exact Match (Pleno)
                 if pred_l == real_l and pred_v == real_v:
                     puntos_base = 5 
                 else:
-                    # B. ¿Acertó al ganador o al empate?
+                    # B. Guessed the winner or draw?
                     acerto_ganador = (diff_pred > 0 and diff_real > 0) or \
                                      (diff_pred < 0 and diff_real < 0) or \
                                      (diff_pred == 0 and diff_real == 0)
                     if acerto_ganador:
                         puntos_base = 3
-                        # C. Bonus por diferencia de goles exacta
+                        # C. Exact goal difference bonus
                         if diff_pred == diff_real:
-                            puntos_base += 1 # 3 + 1 = 4 puntos totales
+                            puntos_base += 1 # 3 + 1 = 4 points total
                 
-                # APLICAR MULTIPLICADOR POR FASE
+                # STAGE MULTIPLIER
                 multiplicador = 1
-                if stage == 1:       # Fase de Grupos
+                if stage == 1:       # Group Stage
                     multiplicador = 1
-                elif stage in [2, 3, 4]: # 16vos, Octavos y Cuartos
+                elif stage in [2, 3, 4]: # Round of 32, 16, Quarters
                     multiplicador = 2
-                elif stage in [5, 6, 7]: # Semifinales, 3er Puesto y Final
+                elif stage in [5, 6, 7]: # Semis, 3rd Place, Final
                     multiplicador = 3
                     
                 return puntos_base * multiplicador
             
-            # Aplicar la fórmula fila por fila
+            # Apply formula row by row
             df_completo['Puntos Obtenidos'] = df_completo.apply(calcular_puntos, axis=1)
             
-            # 5. Agrupar por compañero y sumar sus puntos
+            # 5. Group by player and sum points
             ranking = df_completo.groupby("usuario").agg(
                 Puntos_Totales=('Puntos Obtenidos', 'sum'),
                 Partidos_Acertados=('Puntos Obtenidos', lambda x: (x > 0).sum())
             ).reset_index()
             
-            # Ordenar de mayor a menor y dar formato a la tabla
+            # Sort highest to lowest
             ranking = ranking.sort_values(by=["Puntos_Totales", "Partidos_Acertados"], ascending=[False, False])
             ranking = ranking.rename(columns={
-                "usuario": "Compañero", 
-                "Puntos_Totales": "🏆 Puntos Totales",
-                "Partidos_Acertados": "✅ Partidos con Puntos"
+                "usuario": "Player", 
+                "Puntos_Totales": "🏆 Total Points",
+                "Partidos_Acertados": "✅ Scoring Matches"
             })
             
             st.dataframe(ranking, use_container_width=True, hide_index=True)
-            st.success("¡Tabla actualizada al día de hoy!")
+            st.success("Leaderboard is up to date!")
             
         else:
-            st.info("Aún no se han jugado los partidos que la gente ha pronosticado.")
+            st.info("No predicted matches have been played yet.")
     else:
-        st.info("El Administrador aún no ha cargado resultados oficiales. ¡La tabla de posiciones está en cero!")
+        st.info("The Administrator hasn't loaded any official results yet. The leaderboard is empty!")
