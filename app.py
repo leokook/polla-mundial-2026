@@ -19,7 +19,6 @@ def get_matches_db():
         JOIN teams t1 ON m.home_team_id = t1.id
         JOIN teams t2 ON m.away_team_id = t2.id
         ORDER BY m.kickoff_at ASC
-        LIMIT 15
     '''
     df = pd.read_sql_query(query, conn)
     conn.close()
