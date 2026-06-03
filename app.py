@@ -28,68 +28,68 @@ def get_matches_db():
 st.sidebar.title("🏆 Office Pool 2026")
 pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard"])
 
-banderas = {
+banderas_img = {
     # Anfitriones
-    "Mexico": "🇲🇽",
-    "Canada": "🇨🇦",
-    "USA": "🇺🇸",
+    "Mexico": "mx",
+    "Canada": "ca",
+    "USA": "us",
 
     # CONMEBOL
-    "Argentina": "🇦🇷",
-    "Brazil": "🇧🇷",
-    "Colombia": "🇨🇴",
-    "Ecuador": "🇪🇨",
-    "Paraguay": "🇵🇾",
-    "Uruguay": "🇺🇾",
+    "Argentina": "ar",
+    "Brazil": "br",
+    "Colombia": "co",
+    "Ecuador": "ec",
+    "Paraguay": "py",
+    "Uruguay": "uy",
 
     # UEFA
-    "Austria": "🇦🇹",
-    "Belgium": "🇧🇪",
-    "Bosnia and Herzegovina": "🇧🇦",
-    "Croatia": "🇭🇷",
-    "Czech Republic": "🇨🇿",
-    "England": "🏴",
-    "France": "🇫🇷",
-    "Germany": "🇩🇪",
-    "Netherlands": "🇳🇱",
-    "Norway": "🇳🇴",
-    "Portugal": "🇵🇹",
-    "Scotland": "🏴",
-    "Spain": "🇪🇸",
-    "Sweden": "🇸🇪",
-    "Switzerland": "🇨🇭",
-    "Turkey": "🇹🇷",
+    "Austria": "at",
+    "Belgium": "be",
+    "Bosnia and Herzegovina": "ba",
+    "Croatia": "hr",
+    "Czech Republic": "cz",
+    "England": "gb-eng",
+    "France": "fr",
+    "Germany": "de",
+    "Netherlands": "nl",
+    "Norway": "no",
+    "Portugal": "pt",
+    "Scotland": "gb-sct",
+    "Spain": "es",
+    "Sweden": "se",
+    "Switzerland": "ch",
+    "Turkey": "tr",
 
     # AFC
-    "Australia": "🇦🇺",
-    "Iran": "🇮🇷",
-    "Iraq": "🇮🇶",
-    "Japan": "🇯🇵",
-    "Jordan": "🇯🇴",
-    "Qatar": "🇶🇦",
-    "Saudi Arabia": "🇸🇦",
-    "South Korea": "🇰🇷",
-    "Uzbekistan": "🇺🇿",
+    "Australia": "au",
+    "IR Iran": "ir",
+    "Iraq": "iq",
+    "Japan": "jp",
+    "Jordan": "jo",
+    "Qatar": "qa",
+    "Saudi Arabia": "sa",
+    "South Korea": "kr",
+    "Uzbekistan": "uz",
 
     # CAF
-    "Algeria": "🇩🇿",
-    "Cape Verde": "🇨🇻",
-    "DR Congo": "🇨🇩",
-    "Egypt": "🇪🇬",
-    "Ghana": "🇬🇭",
-    "Ivory Coast": "🇨🇮",
-    "Morocco": "🇲🇦",
-    "Senegal": "🇸🇳",
-    "South Africa": "🇿🇦",
-    "Tunisia": "🇹🇳",
+    "Algeria": "dz",
+    "Cabo Verde": "cv",
+    "DR Congo": "cd",
+    "Egypt": "eg",
+    "Ghana": "gh",
+    "Ivory Coast": "ci",
+    "Morocco": "ma",
+    "Senegal": "sn",
+    "South Africa": "za",
+    "Tunisia": "tn",
 
     # CONCACAF
-    "Curacao": "🇨🇼",
-    "Haiti": "🇭🇹",
-    "Panama": "🇵🇦",
+    "Curacao": "cw",
+    "Haiti": "ht",
+    "Panama": "pa",
 
     # OFC
-    "New Zealand": "🇳🇿"
+    "New Zealand": "nz"
 }
 
 # --- PAGE 1: ENTER PREDICTIONS ---
