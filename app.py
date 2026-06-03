@@ -28,6 +28,70 @@ def get_matches_db():
 st.sidebar.title("🏆 Office Pool 2026")
 pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard"])
 
+banderas = {
+    # Anfitriones
+    "Mexico": "🇲🇽",
+    "Canada": "🇨🇦",
+    "USA": "🇺🇸",
+
+    # CONMEBOL
+    "Argentina": "🇦🇷",
+    "Brazil": "🇧🇷",
+    "Colombia": "🇨🇴",
+    "Ecuador": "🇪🇨",
+    "Paraguay": "🇵🇾",
+    "Uruguay": "🇺🇾",
+
+    # UEFA
+    "Austria": "🇦🇹",
+    "Belgium": "🇧🇪",
+    "Bosnia and Herzegovina": "🇧🇦",
+    "Croatia": "🇭🇷",
+    "Czech Republic": "🇨🇿",
+    "England": "🏴",
+    "France": "🇫🇷",
+    "Germany": "🇩🇪",
+    "Netherlands": "🇳🇱",
+    "Norway": "🇳🇴",
+    "Portugal": "🇵🇹",
+    "Scotland": "🏴",
+    "Spain": "🇪🇸",
+    "Sweden": "🇸🇪",
+    "Switzerland": "🇨🇭",
+    "Turkey": "🇹🇷",
+
+    # AFC
+    "Australia": "🇦🇺",
+    "Iran": "🇮🇷",
+    "Iraq": "🇮🇶",
+    "Japan": "🇯🇵",
+    "Jordan": "🇯🇴",
+    "Qatar": "🇶🇦",
+    "Saudi Arabia": "🇸🇦",
+    "South Korea": "🇰🇷",
+    "Uzbekistan": "🇺🇿",
+
+    # CAF
+    "Algeria": "🇩🇿",
+    "Cape Verde": "🇨🇻",
+    "DR Congo": "🇨🇩",
+    "Egypt": "🇪🇬",
+    "Ghana": "🇬🇭",
+    "Ivory Coast": "🇨🇮",
+    "Morocco": "🇲🇦",
+    "Senegal": "🇸🇳",
+    "South Africa": "🇿🇦",
+    "Tunisia": "🇹🇳",
+
+    # CONCACAF
+    "Curacao": "🇨🇼",
+    "Haiti": "🇭🇹",
+    "Panama": "🇵🇦",
+
+    # OFC
+    "New Zealand": "🇳🇿"
+}
+
 # --- PAGE 1: ENTER PREDICTIONS ---
 if pagina == "Enter Predictions":
     st.title("⚽ Enter or Edit Your Predictions")
@@ -56,8 +120,18 @@ if pagina == "Enter Predictions":
         
         for index, row in df_partidos.iterrows():
             match_id = str(row['id'])
-            equipo_local = row['home']
-            equipo_visita = row['away']
+            nombre_local = row['home']
+            nombre_visita = row['away']
+            
+            # Buscamos la bandera en el diccionario
+            bandera_local = banderas.get(nombre_local, "🏳️")
+            bandera_visita = banderas.get(nombre_visita, "🏳️")
+            
+            # Unimos la bandera con el nombre
+            equipo_local = f"{bandera_local} {nombre_local}"
+            equipo_visita = f"{bandera_visita} {nombre_visita}"
+            fecha_str = row['kickoff_at'][:19]
+            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
             fecha_str = row['kickoff_at'][:19]
             fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
             
