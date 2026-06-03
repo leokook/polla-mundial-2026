@@ -119,21 +119,33 @@ if pagina == "Enter Predictions":
         df_partidos = get_matches_db()
         
         for index, row in df_partidos.iterrows():
-            match_id = str(row['id'])
+            # Obtenemos los nombres reales
             nombre_local = row['home']
             nombre_visita = row['away']
             
-            # Buscamos la bandera en el diccionario
-            bandera_local = banderas.get(nombre_local, "🏳️")
-            bandera_visita = banderas.get(nombre_visita, "🏳️")
+            # Buscamos el código de la bandera (si no existe, usa 'un' que es genérico)
+            cod_local = banderas_img.get(nombre_local, "un")
+            cod_visita = banderas_img.get(nombre_visita, "un")
             
-            # Unimos la bandera con el nombre
-            equipo_local = f"{bandera_local} {nombre_local}"
-            equipo_visita = f"{bandera_visita} {nombre_visita}"
-            fecha_str = row['kickoff_at'][:19]
-            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
-            fecha_str = row['kickoff_at'][:19]
-            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
+            # Creamos el código HTML para mostrar la imagen de la bandera + el nombre
+            html_local = f"<img src='https://flagcdn.com/24x18/{cod_local}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_local}</b>"
+            html_visita = f"<img src='https://flagcdn.com/24x18/{cod_visita}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_visita}</b>"
+
+            # Display the form
+            with st.form(key=f"form_{match_id}"):
+                st.write(f"📅 Kickoff: **{fecha_str}**")
+                col1, col2, col3 = st.columns([2, 1, 2])
+                with col1:
+                    # Usamos st.markdown con unsafe_allow_html para que lea la imagen
+                    st.markdown(html_local, unsafe_allow_html=True)
+                    goles_l = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
+                with col2:
+                    st.write("VS")
+                with col3:
+                    st.markdown(html_visita, unsafe_allow_html=True)
+                    goles_v = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
+                
+                submit = st.form_submit_button(texto_boton)
             
             # 1. TIME LOCK (1 minute before kickoff)
             limite_modificacion = fecha_partido - timedelta(minutes=1)
