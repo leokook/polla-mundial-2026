@@ -118,7 +118,7 @@ if pagina == "Enter Predictions":
 
         df_partidos = get_matches_db()
         
-for index, row in df_partidos.iterrows():
+        for index, row in df_partidos.iterrows():
             # Extraemos todos los datos básicos del partido
             match_id = str(row['id'])
             nombre_local = row['home']
