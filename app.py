@@ -50,6 +50,7 @@ banderas_img = {
     "Czech Republic": "cz",
     "England": "gb-eng",
     "France": "fr",
+    "Denmark": "dk",
     "Germany": "de",
     "Netherlands": "nl",
     "Norway": "no",
