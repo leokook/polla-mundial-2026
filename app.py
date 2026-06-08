@@ -94,12 +94,14 @@ banderas_img = {
 }
 
 # --- PAGE 1: ENTER PREDICTIONS ---
+# --- PAGE 1: ENTER PREDICTIONS ---
 if pagina == "Enter Predictions":
     st.title("⚽ Enter or Edit Your Predictions")
     
     # DYNAMIC USER MANAGEMENT: Read from Google Sheets
     try:
         df_users = conn_sheets.read(worksheet="users", ttl=10)
+        df_users['pin'] = df_users['pin'].astype(str) 
         lista_usuarios = ["Select your name..."] + df_users['user_name'].dropna().tolist()
     except:
         lista_usuarios = ["Select your name...", "Admin: Create 'users' tab in Sheets"]
@@ -107,97 +109,109 @@ if pagina == "Enter Predictions":
     usuario_actual = st.selectbox("Who are you?", lista_usuarios)
 
     if usuario_actual != "Select your name...":
-        st.write("---")
-        st.info("💡 You can edit your predictions up to 1 minute before kickoff.")
         
-        # Load existing predictions to check for previous votes
-        try:
-            predicciones_existentes = conn_sheets.read(ttl=5)
-            predicciones_existentes['match_id'] = predicciones_existentes['match_id'].astype(str) 
-        except:
-            predicciones_existentes = pd.DataFrame(columns=["usuario", "match_id", "goles_local", "goles_visita", "fecha_ingreso"])
-
-        df_partidos = get_matches_db()
+        # 1. BUSCAR EL PIN REAL DEL USUARIO EN LA BASE DE DATOS
+        pin_real = df_users.loc[df_users['user_name'] == usuario_actual, 'pin'].values[0]
         
-        for index, row in df_partidos.iterrows():
-            # Extraemos todos los datos básicos del partido
-            match_id = str(row['id'])
-            nombre_local = row['home']
-            nombre_visita = row['away']
-            fecha_str = row['kickoff_at'][:19]
-            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
+        # 2. PEDIR EL PIN AL USUARIO
+        pin_ingresado = st.text_input("Enter your PIN:", type="password")
+        
+        # 3. VERIFICAR SI COINCIDEN
+        if pin_ingresado == pin_real:
+            st.success("✅ Access granted!")
+            st.write("---")
+            st.info("💡 You can edit your predictions up to 1 minute before kickoff.")
             
-            # 1. TIME LOCK (1 minute before kickoff)
-            limite_modificacion = fecha_partido - timedelta(minutes=1)
+            # --- TODO ESTE BLOQUE DEBE ESTAR INDENTADO AQUÍ DENTRO ---
             
-            if datetime.now() > limite_modificacion:
-                st.warning(f"🔒 {nombre_local} vs {nombre_visita} - Match locked")
-                continue # Skip to next match
-            
-            # 2. CHECK IF USER ALREADY VOTED TO LOAD PREVIOUS NUMBERS
-            goles_l_previo = 0
-            goles_v_previo = 0
-            texto_boton = "Save Prediction"
-            
-            if not predicciones_existentes.empty:
-                voto_previo = predicciones_existentes[
-                    (predicciones_existentes['usuario'] == usuario_actual) & 
-                    (predicciones_existentes['match_id'] == match_id)
-                ]
-                
-                if not voto_previo.empty:
-                    goles_l_previo = int(voto_previo['goles_local'].values[0])
-                    goles_v_previo = int(voto_previo['goles_visita'].values[0])
-                    texto_boton = "Update Prediction"
-                    st.success(f"✏️ You already have a prediction saved for this match, but you can change it.")
+            # Load existing predictions to check for previous votes
+            try:
+                predicciones_existentes = conn_sheets.read(ttl=5)
+                predicciones_existentes['match_id'] = predicciones_existentes['match_id'].astype(str) 
+            except:
+                predicciones_existentes = pd.DataFrame(columns=["usuario", "match_id", "goles_local", "goles_visita", "fecha_ingreso"])
 
-            # 3. HTML FLAGS (Aquí evitamos el error de Windows)
-            cod_local = banderas_img.get(nombre_local, "un")
-            cod_visita = banderas_img.get(nombre_visita, "un")
+            df_partidos = get_matches_db()
             
-            html_local = f"<img src='https://flagcdn.com/24x18/{cod_local}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_local}</b>"
-            html_visita = f"<img src='https://flagcdn.com/24x18/{cod_visita}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_visita}</b>"
-
-            # 4. DISPLAY THE FORM
-            with st.form(key=f"form_{match_id}"):
-                st.write(f"📅 Kickoff: **{fecha_str}**")
-                col1, col2, col3 = st.columns([2, 1, 2])
-                with col1:
-                    st.markdown(html_local, unsafe_allow_html=True)
-                    goles_l = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
-                with col2:
-                    st.write("VS")
-                with col3:
-                    st.markdown(html_visita, unsafe_allow_html=True)
-                    goles_v = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
+            for index, row in df_partidos.iterrows():
+                # Extraemos todos los datos básicos del partido
+                match_id = str(row['id'])
+                nombre_local = row['home']
+                nombre_visita = row['away']
+                fecha_str = row['kickoff_at'][:19]
+                fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
                 
-                submit = st.form_submit_button(texto_boton)
+                # 1. TIME LOCK
+                limite_modificacion = fecha_partido - timedelta(minutes=1)
                 
-                if submit:
-                    # Create new row with updated data
-                    nueva_fila = pd.DataFrame([{
-                        "usuario": usuario_actual,
-                        "match_id": match_id,
-                        "goles_local": goles_l,
-                        "goles_visita": goles_v,
-                        "fecha_ingreso": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }])
+                if datetime.now() > limite_modificacion:
+                    st.warning(f"🔒 {nombre_local} vs {nombre_visita} - Match locked")
+                    continue 
+                
+                # 2. CHECK IF USER ALREADY VOTED TO LOAD PREVIOUS NUMBERS
+                goles_l_previo = 0
+                goles_v_previo = 0
+                texto_boton = "Save Prediction"
+                
+                if not predicciones_existentes.empty:
+                    voto_previo = predicciones_existentes[
+                        (predicciones_existentes['usuario'] == usuario_actual) & 
+                        (predicciones_existentes['match_id'] == match_id)
+                    ]
                     
-                    # If vote existed, delete it before appending the new one
-                    if not predicciones_existentes.empty:
-                        df_limpio = predicciones_existentes[
-                            ~((predicciones_existentes['usuario'] == usuario_actual) & 
-                              (predicciones_existentes['match_id'] == match_id))
-                        ]
-                        df_actualizado = pd.concat([df_limpio, nueva_fila], ignore_index=True)
-                    else:
-                        df_actualizado = nueva_fila
+                    if not voto_previo.empty:
+                        goles_l_previo = int(voto_previo['goles_local'].values[0])
+                        goles_v_previo = int(voto_previo['goles_visita'].values[0])
+                        texto_boton = "Update Prediction"
+                        st.success(f"✏️ You already have a prediction saved for this match, but you can change it.")
 
-                    # Upload corrected table to Google Sheets
-                    conn_sheets.update(data=df_actualizado)
-                    st.success("Prediction saved successfully! Reloading...")
-                    st.rerun()
+                # 3. HTML FLAGS
+                cod_local = banderas_img.get(nombre_local, "un")
+                cod_visita = banderas_img.get(nombre_visita, "un")
+                
+                html_local = f"<img src='https://flagcdn.com/24x18/{cod_local}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_local}</b>"
+                html_visita = f"<img src='https://flagcdn.com/24x18/{cod_visita}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_visita}</b>"
 
+                # 4. DISPLAY THE FORM
+                with st.form(key=f"form_{match_id}"):
+                    st.write(f"📅 Kickoff: **{fecha_str}**")
+                    col1, col2, col3 = st.columns([2, 1, 2])
+                    with col1:
+                        st.markdown(html_local, unsafe_allow_html=True)
+                        goles_l = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
+                    with col2:
+                        st.write("VS")
+                    with col3:
+                        st.markdown(html_visita, unsafe_allow_html=True)
+                        goles_v = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
+                    
+                    submit = st.form_submit_button(texto_boton)
+                    
+                    if submit:
+                        nueva_fila = pd.DataFrame([{
+                            "usuario": usuario_actual,
+                            "match_id": match_id,
+                            "goles_local": goles_l,
+                            "goles_visita": goles_v,
+                            "fecha_ingreso": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }])
+                        
+                        if not predicciones_existentes.empty:
+                            df_limpio = predicciones_existentes[
+                                ~((predicciones_existentes['usuario'] == usuario_actual) & 
+                                  (predicciones_existentes['match_id'] == match_id))
+                            ]
+                            df_actualizado = pd.concat([df_limpio, nueva_fila], ignore_index=True)
+                        else:
+                            df_actualizado = nueva_fila
+
+                        conn_sheets.update(data=df_actualizado)
+                        st.success("Prediction saved successfully! Reloading...")
+                        st.rerun()
+
+        elif pin_ingresado != "":
+            st.error("❌ Incorrect PIN. Please try again.")
+            
 # --- PAGE 2: LEADERBOARD ---
 elif pagina == "Leaderboard":
     st.title("📊 Official Leaderboard")
