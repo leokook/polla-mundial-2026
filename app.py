@@ -26,7 +26,7 @@ def get_matches_db():
 
 # Sidebar menu
 st.sidebar.title("🏆 Office Pool 2026")
-pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard"])
+pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard", "Rules & Scoring"])
 
 banderas_img = {
     # Anfitriones
@@ -296,3 +296,54 @@ elif pagina == "Leaderboard":
             st.info("No predicted matches have been played yet.")
     else:
         st.info("The Administrator hasn't loaded any official results yet. The leaderboard is empty!")
+
+# --- PAGE 3: RULES & SCORING ---
+elif pagina == "Rules & Scoring":
+    st.title("📖 Rules & Scoring System")
+    
+    st.markdown("""
+    Welcome to the Office Pool! Here is everything you need to know to play and win.
+
+    ### ⏱️ General Rules
+    * **Lock Time:** You can enter or modify your predictions up to **1 minute before** the scheduled kickoff time. Once the match starts, predictions are sealed.
+    * **90 Minutes Only:** For knockout stages, the score that counts is the one at the end of regular time (90 minutes + injury time). Extra time and penalty shootouts **do not count** towards your prediction.
+
+    ---
+
+    ### 🎯 Base Points
+    Points are awarded based on how accurate your prediction is compared to the real official result.
+
+    * 🥇 **Exact Match (Pleno) = 5 Points** You nailed the exact score of the match.
+    * 🥈 **Winner + Exact Goal Difference = 4 Points** You guessed the correct winner and the exact margin of victory, but not the exact score.
+    * 🥉 **Correct Winner or Draw = 3 Points** You correctly guessed who would win (or if it would be a tie), but missed the goal difference.
+    * ❌ **Wrong Prediction = 0 Points** You guessed the wrong winner.
+
+    ---
+
+    ### 📈 Stage Multipliers
+    As the tournament progresses, the stakes get higher! Your base points are multiplied depending on the tournament stage:
+
+    * **Group Stage:** Base Points **x 1**
+    * **Round of 32, Round of 16 & Quarter-Finals:** Base Points **x 2**
+    * **Semi-Finals, 3rd Place Match & Final:** Base Points **x 3**
+
+    ---
+
+    ### 📝 Scoring Examples
+    Let's say the real match between **Mexico and Canada** ends **2 - 1** (Mexico wins by 1 goal).
+    Here is how different predictions would be scored during the Group Stage (Multiplier x1):
+    """)
+
+    # Tabla de ejemplos muy visual usando Markdown
+    st.markdown("""
+    | Your Prediction | Base Points | Reason |
+    | :--- | :---: | :--- |
+    | **2 - 1** | **5** | 🥇 **Exact match!** Perfect score. |
+    | **3 - 2** | **4** | 🥈 Correct winner (Mexico) + exact goal difference (+1). |
+    | **1 - 0** | **4** | 🥈 Correct winner (Mexico) + exact goal difference (+1). |
+    | **3 - 0** | **3** | 🥉 Correct winner (Mexico), but wrong goal difference (+3). |
+    | **1 - 1** | **0** | ❌ Wrong result (you predicted a tie). |
+    | **0 - 1** | **0** | ❌ Wrong winner (you predicted Canada). |
+    """)
+    
+    st.info("💡 **Pro Tip:** In the final match (x3 multiplier), a perfect 'Exact Match' prediction is worth a massive **15 points** (5 base points x 3). Nobody is out of the game until the very end!")
