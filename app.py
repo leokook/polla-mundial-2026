@@ -94,7 +94,6 @@ banderas_img = {
 }
 
 # --- PAGE 1: ENTER PREDICTIONS ---
-# --- PAGE 1: ENTER PREDICTIONS ---
 if pagina == "Enter Predictions":
     st.title("⚽ Enter or Edit Your Predictions")
     
