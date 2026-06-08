@@ -100,7 +100,8 @@ if pagina == "Enter Predictions":
     # DYNAMIC USER MANAGEMENT: Read from Google Sheets
     try:
         df_users = conn_sheets.read(worksheet="users", ttl=10)
-        df_users['pin'] = df_users['pin'].astype(str) 
+       # Convertimos a texto, borramos el ".0" invisible y quitamos espacios en blanco
+        df_users['pin'] = df_users['pin'].astype(str).str.replace('.0', '', regex=False).str.strip()
         lista_usuarios = ["Select your name..."] + df_users['user_name'].dropna().tolist()
     except:
         lista_usuarios = ["Select your name...", "Admin: Create 'users' tab in Sheets"]
@@ -112,8 +113,8 @@ if pagina == "Enter Predictions":
         # 1. BUSCAR EL PIN REAL DEL USUARIO EN LA BASE DE DATOS
         pin_real = df_users.loc[df_users['user_name'] == usuario_actual, 'pin'].values[0]
         
-        # 2. PEDIR EL PIN AL USUARIO
-        pin_ingresado = st.text_input("Enter your PIN:", type="password")
+        # 2. PEDIR EL PIN AL USUARIO (quitando espacios accidentales al inicio o final)
+        pin_ingresado = st.text_input("Enter your PIN:", type="password").strip()
         
         # 3. VERIFICAR SI COINCIDEN
         if pin_ingresado == pin_real:
