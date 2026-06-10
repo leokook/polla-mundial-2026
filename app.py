@@ -124,10 +124,12 @@ if pagina == "Enter Predictions":
             
             # --- TODO ESTE BLOQUE DEBE ESTAR INDENTADO AQUÍ DENTRO ---
             
-            # Load existing predictions to check for previous votes
+        # Load existing predictions to check for previous votes
             try:
                 predicciones_existentes = conn_sheets.read(ttl=5)
-                predicciones_existentes['match_id'] = predicciones_existentes['match_id'].astype(str) 
+                # Limpiamos el decimal invisible del match_id y quitamos espacios
+                predicciones_existentes['match_id'] = predicciones_existentes['match_id'].astype(str).str.replace('.0', '', regex=False).str.strip()
+                predicciones_existentes['usuario'] = predicciones_existentes['usuario'].astype(str).str.strip()
             except:
                 predicciones_existentes = pd.DataFrame(columns=["usuario", "match_id", "goles_local", "goles_visita", "fecha_ingreso"])
 
@@ -160,8 +162,8 @@ if pagina == "Enter Predictions":
                     ]
                     
                     if not voto_previo.empty:
-                        goles_l_previo = int(voto_previo['goles_local'].values[0])
-                        goles_v_previo = int(voto_previo['goles_visita'].values[0])
+                        goles_l_previo = int(float(voto_previo['goles_local'].values[0]))
+                        goles_v_previo = int(float(voto_previo['goles_visita'].values[0]))
                         texto_boton = "Update Prediction"
                         st.success(f"✏️ You already have a prediction saved for this match, but you can change it.")
 
