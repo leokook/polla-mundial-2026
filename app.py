@@ -78,14 +78,14 @@ banderas_img = {
     "DR Congo": "cd",
     "Egypt": "eg",
     "Ghana": "gh",
-    "Ivory Coast": "ci",
+    "Côte d'Ivoire": "ci",
     "Morocco": "ma",
     "Senegal": "sn",
     "South Africa": "za",
     "Tunisia": "tn",
 
     # CONCACAF
-    "Curacao": "cw",
+    "Curaçao": "cw",
     "Haiti": "ht",
     "Panama": "pa",
 
