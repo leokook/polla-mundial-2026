@@ -26,9 +26,10 @@ def get_matches_db():
     conn_db.close()
     return df
 
+
 # Sidebar menu
 st.sidebar.title("🏆 Office Pool 2026")
-pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard", "Rules & Scoring"])
+pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "View Predictions", "Leaderboard", "Rules & Scoring"])
 
 banderas_img = {
     "Mexico": "mx", "Canada": "ca", "USA": "us",
@@ -247,6 +248,62 @@ elif pagina == "Leaderboard":
             st.info("No predicted matches have been played yet.")
     else:
         st.info("The Administrator hasn't loaded any official results yet. The leaderboard is empty!")
+
+# --- PAGE: VIEW PREDICTIONS ---
+elif pagina == "View Predictions":
+    st.title("👀 View Others' Predictions")
+    st.write("Curious about what your colleagues predicted? Select a match below.")
+    st.info("🔒 **Anti-Cheat System:** To prevent copying, you can only view predictions for matches that are already locked (kickoff is less than 1 minute away).")
+
+    df_partidos = get_matches_db()
+    
+    # Calcular la hora actual en Toronto para ser justos con los bloqueos
+    ahora_toronto = pd.Timestamp.now('America/Toronto').to_pydatetime().replace(tzinfo=None)
+    
+    # Filtrar solo los partidos que ya pasaron su límite de modificación
+    df_partidos['kickoff_dt'] = pd.to_datetime(df_partidos['kickoff_at'].str[:19])
+    df_partidos['limite'] = df_partidos['kickoff_dt'] - timedelta(minutes=1)
+    
+    df_bloqueados = df_partidos[df_partidos['limite'] < ahora_toronto].copy()
+    
+    if df_bloqueados.empty:
+        st.warning("No matches have been locked yet. Check back just before the first kickoff!")
+    else:
+        # Crear un diccionario para el menú desplegable (Ej: "Mexico vs Canada - 2026-06-11")
+        opciones_partidos = df_bloqueados.apply(lambda x: f"{x['home']} vs {x['away']} ({x['kickoff_at'][:10]})", axis=1).tolist()
+        ids_partidos = df_bloqueados['id'].astype(str).tolist()
+        diccionario_partidos = dict(zip(opciones_partidos, ids_partidos))
+        
+        partido_seleccionado = st.selectbox("Select a locked match:", opciones_partidos)
+        match_id_seleccionado = diccionario_partidos[partido_seleccionado]
+        
+        # Descargar de Supabase solo los votos de ese partido
+        try:
+            res_votos = supabase.table('predictions').select('*').eq('match_id', match_id_seleccionado).execute()
+            df_votos_partido = pd.DataFrame(res_votos.data)
+        except:
+            df_votos_partido = pd.DataFrame()
+            
+        if not df_votos_partido.empty:
+            # Obtener nombres de los equipos para las columnas
+            equipo_local = df_bloqueados[df_bloqueados['id'].astype(str) == match_id_seleccionado]['home'].values[0]
+            equipo_visita = df_bloqueados[df_bloqueados['id'].astype(str) == match_id_seleccionado]['away'].values[0]
+            
+            # Limpiar y renombrar la tabla para que se vea profesional
+            df_votos_partido = df_votos_partido[['usuario', 'goles_local', 'goles_visita']]
+            df_votos_partido = df_votos_partido.rename(columns={
+                'usuario': 'Player',
+                'goles_local': f'{equipo_local} Goals',
+                'goles_visita': f'{equipo_visita} Goals'
+            })
+            
+            # Ordenar alfabéticamente por jugador
+            df_votos_partido = df_votos_partido.sort_values(by='Player')
+            
+            st.dataframe(df_votos_partido, use_container_width=True, hide_index=True)
+            st.success(f"Showing {len(df_votos_partido)} predictions for this match.")
+        else:
+            st.info("Nobody submitted a prediction for this match. 😱")
 
 # --- PAGE 3: RULES & SCORING ---
 elif pagina == "Rules & Scoring":
