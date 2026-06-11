@@ -40,8 +40,7 @@ st.sidebar.title("🏆 Office Pool 2026")
 opciones_menu = ["Enter Predictions", "View Predictions", "Leaderboard", "Rules & Scoring"]
 
 # 2. Verificamos si el usuario actual es el Administrador
-# RECUERDA: Cambia "Tu Nombre Exacto" por tu usuario real de la base de datos
-if st.session_state['usuario_logeado'] == "Tu Nombre Exacto":
+if st.session_state['usuario_logeado'] == "Leonardo Guevara":
     opciones_menu.append("Admin Panel")
 
 # 3. Dibujamos el menú usando la variable que acabamos de crear
