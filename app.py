@@ -111,9 +111,12 @@ if pagina == "Enter Predictions":
             
             limite_modificacion = fecha_partido - timedelta(minutes=1)
             
-            if datetime.now() > limite_modificacion:
+            # Forzar la hora actual a la zona horaria de Toronto/Este
+            ahora_toronto = pd.Timestamp.now('America/Toronto').to_pydatetime().replace(tzinfo=None)
+            
+            if ahora_toronto > limite_modificacion:
                 st.warning(f"🔒 {nombre_local} vs {nombre_visita} - Match locked")
-                continue 
+                continue
             
             goles_l_previo = 0
             goles_v_previo = 0
