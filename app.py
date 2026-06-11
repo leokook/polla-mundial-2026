@@ -65,8 +65,6 @@ banderas_img = {
 if pagina == "Enter Predictions":
     st.title("⚽ Enter or Edit Your Predictions")
     
-    if 'usuario_logeado' not in st.session_state:
-        st.session_state['usuario_logeado'] = None
 
     # Leer usuarios directo desde Supabase
     try:
