@@ -155,7 +155,7 @@ if pagina == "Enter Predictions":
                         "goles_local": goles_l,
                         "goles_visita": goles_v
                     }
-                    supabase.table("predictions").upsert(data_insert).execute()
+                    supabase.table("predictions").upsert(data_insert, on_conflict="usuario,match_id").execute()
                     
                     st.success("Prediction saved successfully! Reloading...")
                     st.rerun()
