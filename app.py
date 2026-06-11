@@ -31,6 +31,12 @@ def get_matches_db():
 st.sidebar.title("🏆 Office Pool 2026")
 pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "View Predictions", "Leaderboard", "Rules & Scoring"])
 
+# ¡SI ERES TÚ, SE ACTIVA EL PANEL OCULTO! (Reemplaza 'Tu Nombre Exacto' por tu usuario)
+if st.session_state.get('usuario_logeado') == "Leonardo Guevara":
+    opciones_menu.append("Admin Panel")
+
+pagina = st.sidebar.radio("Navigation", opciones_menu)
+
 banderas_img = {
     "Mexico": "mx", "Canada": "ca", "USA": "us",
     "Argentina": "ar", "Brazil": "br", "Colombia": "co", "Ecuador": "ec", "Paraguay": "py", "Uruguay": "uy",
@@ -354,3 +360,70 @@ elif pagina == "Rules & Scoring":
     """)
     
     st.info("💡 **Pro Tip:** In the final match (x3 multiplier), a perfect 'Exact Match' prediction is worth a massive **15 points** (5 base points x 3). Nobody is out of the game until the very end!")
+
+# --- PAGE: ADMIN PANEL (EXCLUSIVE) ---
+elif pagina == "Admin Panel":
+    st.title("⚙️ Administrator Control Panel")
+    st.write("Welcome, boss! Here you can load official match results to update the leaderboard.")
+    
+    # 1. Traer los partidos de la base de datos local
+    df_partidos = get_matches_db()
+    
+    # Crear un formato cómodo para el menú desplegable (Ej: "1 - Mexico vs South Africa")
+    opciones_partidos = df_partidos.apply(lambda x: f"{x['id']} - {x['home']} vs {x['away']}", axis=1).tolist()
+    partido_seleccionado = st.selectbox("Select the match that just finished:", opciones_partidos)
+    
+    # Extraer el ID real del partido seleccionado
+    match_id_real = partido_seleccionado.split(" - ")[0]
+    
+    # 2. Verificar si este partido ya tenía un resultado guardado antes en Supabase
+    try:
+        res_existente = supabase.table('resultados_reales').select('*').eq('match_id', match_id_real).execute()
+        df_existente = pd.DataFrame(res_existente.data)
+    except:
+        df_existente = pd.DataFrame()
+        
+    goles_l_previo = 0
+    goles_v_previo = 0
+    texto_boton_admin = "Save Official Result"
+    
+    if not df_existente.empty:
+        goles_l_previo = int(df_existente['goles_local_real'].values[0])
+        goles_v_previo = int(df_existente['goles_visita_real'].values[0])
+        texto_boton_admin = "Update Official Result"
+        st.warning(f"⚠️ This match already has a saved result ({goles_l_previo} - {goles_v_previo}). Saving again will overwrite it.")
+
+    # 3. Formulario para ingresar el marcador real
+    # Obtenemos los nombres de los equipos para que el formulario sea muy visual
+    partido_info = df_partidos[df_partidos['id'].astype(str) == match_id_real].iloc[0]
+    
+    with st.form(key="form_admin_resultados"):
+        st.subheader("⚽ Enter Final Score (90 Mins)")
+        col1, col2, col3 = st.columns([2, 1, 2])
+        
+        with col1:
+            st.markdown(f"**{partido_info['home']}**")
+            goles_local_real = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key="admin_gl")
+        with col2:
+            st.write("VS")
+        with col3:
+            st.markdown(f"**{partido_info['away']}**")
+            goles_visita_real = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key="admin_gv")
+            
+        submit_admin = st.form_submit_button(texto_boton_admin)
+        
+        if submit_admin:
+            # Estructura de datos para Supabase
+            data_resultado = {
+                "match_id": str(match_id_real),
+                "goles_local_real": int(goles_local_real),
+                "goles_visita_real": int(goles_visita_real)
+            }
+            
+            # Guardar en Supabase usando UPSERT (crea o actualiza por llave primaria 'match_id')
+            try:
+                supabase.table("resultados_reales").upsert(data_resultado).execute()
+                st.success(f"🏆 Result for {partido_info['home']} {goles_local_real} - {goles_visita_real} {partido_info['away']} saved successfully!")
+                st.balloons() # ¡Efecto de globos para celebrar!
+            except Exception as e:
+                st.error(f"❌ Error saving to database: {e}")
