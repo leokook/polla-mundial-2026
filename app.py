@@ -2,17 +2,19 @@ import streamlit as st
 import sqlite3
 from datetime import datetime, timedelta
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
+from st_supabase_connection import SupabaseConnection
 
 # Page configuration
 st.set_page_config(page_title="World Cup 2026 Pool", page_icon="🏆", layout="centered")
 
-# --- GOOGLE SHEETS CONNECTION ---
-conn_sheets = st.connection("gsheets", type=GSheetsConnection)
+# --- SUPABASE CONNECTION ---
+# Conexión nativa, robusta y a prueba de alto tráfico
+conn = st.connection("supabase", type=SupabaseConnection)
+supabase = conn.client
 
 # --- SQLITE LOCAL CONNECTION (To read matches) ---
 def get_matches_db():
-    conn = sqlite3.connect('worldcup2026.db')
+    conn_db = sqlite3.connect('worldcup2026.db')
     query = '''
         SELECT m.id, m.kickoff_at, t1.team_name as home, t2.team_name as away 
         FROM matches m
@@ -20,8 +22,8 @@ def get_matches_db():
         JOIN teams t2 ON m.away_team_id = t2.id
         ORDER BY m.kickoff_at ASC
     '''
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    df = pd.read_sql_query(query, conn_db)
+    conn_db.close()
     return df
 
 # Sidebar menu
@@ -29,23 +31,16 @@ st.sidebar.title("🏆 Office Pool 2026")
 pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "Leaderboard", "Rules & Scoring"])
 
 banderas_img = {
-    # Anfitriones
     "Mexico": "mx", "Canada": "ca", "USA": "us",
-    # CONMEBOL
     "Argentina": "ar", "Brazil": "br", "Colombia": "co", "Ecuador": "ec", "Paraguay": "py", "Uruguay": "uy",
-    # UEFA
     "Austria": "at", "Belgium": "be", "Bosnia and Herzegovina": "ba", "Croatia": "hr", "Czech Republic": "cz",
     "England": "gb-eng", "France": "fr", "Denmark": "dk", "Germany": "de", "Netherlands": "nl", "Norway": "no",
     "Portugal": "pt", "Scotland": "gb-sct", "Spain": "es", "Sweden": "se", "Switzerland": "ch", "Turkey": "tr",
-    # AFC
     "Australia": "au", "IR Iran": "ir", "Iraq": "iq", "Japan": "jp", "Jordan": "jo", "Qatar": "qa",
     "Saudi Arabia": "sa", "South Korea": "kr", "Uzbekistan": "uz",
-    # CAF
     "Algeria": "dz", "Cabo Verde": "cv", "DR Congo": "cd", "Egypt": "eg", "Ghana": "gh", 
     "Côte d'Ivoire": "ci", "Morocco": "ma", "Senegal": "sn", "South Africa": "za", "Tunisia": "tn",
-    # CONCACAF
     "Curaçao": "cw", "Haiti": "ht", "Panama": "pa",
-    # OFC
     "New Zealand": "nz"
 }
 
@@ -53,21 +48,23 @@ banderas_img = {
 if pagina == "Enter Predictions":
     st.title("⚽ Enter or Edit Your Predictions")
     
-    # 1. INICIALIZAR LA MEMORIA DEL NAVEGADOR (Evita los deslogueos)
     if 'usuario_logeado' not in st.session_state:
         st.session_state['usuario_logeado'] = None
 
-    # 2. CARGAR USUARIOS CON TTL ALTO (10 Minutos) PARA NO SATURAR A GOOGLE
+    # Leer usuarios directo desde Supabase
     try:
-        df_users = conn_sheets.read(worksheet="users", ttl=600)
-        df_users['pin'] = df_users['pin'].astype(str).str.replace('.0', '', regex=False).str.strip()
-        lista_usuarios = ["Select your name..."] + df_users['user_name'].dropna().tolist()
+        res_users = supabase.table('users').select('*').execute()
+        df_users = pd.DataFrame(res_users.data)
+        if not df_users.empty:
+            df_users['pin'] = df_users['pin'].astype(str).str.strip()
+            lista_usuarios = ["Select your name..."] + df_users['user_name'].tolist()
+        else:
+            lista_usuarios = ["Select your name..."]
     except Exception as e:
-        st.error("⚠️ Connection to database is busy. Please refresh the page in a few seconds.")
-        lista_usuarios = ["Select your name..."]
-        df_users = pd.DataFrame()
+        st.error("⚠️ Connection error. Please contact the administrator.")
+        st.stop()
 
-    # 3. PANTALLA DE INICIO DE SESIÓN
+    # PANTALLA DE LOGIN
     if st.session_state['usuario_logeado'] is None:
         usuario_actual = st.selectbox("Who are you?", lista_usuarios)
 
@@ -76,17 +73,15 @@ if pagina == "Enter Predictions":
             pin_ingresado = st.text_input("Enter your PIN:", type="password").strip()
             
             if pin_ingresado == pin_real:
-                # Guardamos al usuario en la sesión de forma permanente
                 st.session_state['usuario_logeado'] = usuario_actual
                 st.rerun() 
             elif pin_ingresado != "":
                 st.error("❌ Incorrect PIN. Please try again.")
                 
-    # 4. PANTALLA DE PREDICCIONES (Una vez que ya inició sesión)
+    # PANTALLA DE PREDICCIONES
     else:
         usuario_actual = st.session_state['usuario_logeado']
         
-        # Mostrar quién está logeado y dar botón de salida
         col_log1, col_log2 = st.columns([3, 1])
         with col_log1:
             st.success(f"✅ Logged in as: **{usuario_actual}**")
@@ -98,15 +93,13 @@ if pagina == "Enter Predictions":
         st.write("---")
         st.info("💡 You can edit your predictions up to 1 minute before kickoff.")
         
-        # Aumentamos el TTL a 60 segundos para evitar bloqueos
+        # Obtener SOLO los votos de este usuario para que cargue rapidísimo
         try:
-            predicciones_existentes = conn_sheets.read(ttl=60)
-            predicciones_existentes['match_id'] = predicciones_existentes['match_id'].astype(str).str.replace('.0', '', regex=False).str.strip()
-            predicciones_existentes['usuario'] = predicciones_existentes['usuario'].astype(str).str.strip()
+            res_votos = supabase.table('predictions').select('*').eq('usuario', usuario_actual).execute()
+            df_votos_usuario = pd.DataFrame(res_votos.data)
         except:
-            predicciones_existentes = pd.DataFrame(columns=["usuario", "match_id", "goles_local", "goles_visita", "fecha_ingreso"])
+            df_votos_usuario = pd.DataFrame()
 
-        # AQUÍ ESTÁ LA LÍNEA QUE TE FALTABA PARA EVITAR EL ERROR
         df_partidos = get_matches_db()
         
         for index, row in df_partidos.iterrows():
@@ -126,15 +119,12 @@ if pagina == "Enter Predictions":
             goles_v_previo = 0
             texto_boton = "Save Prediction"
             
-            if not predicciones_existentes.empty:
-                voto_previo = predicciones_existentes[
-                    (predicciones_existentes['usuario'] == usuario_actual) & 
-                    (predicciones_existentes['match_id'] == match_id)
-                ]
+            if not df_votos_usuario.empty:
+                voto_previo = df_votos_usuario[df_votos_usuario['match_id'] == match_id]
                 
                 if not voto_previo.empty:
-                    goles_l_previo = int(float(voto_previo['goles_local'].values[0]))
-                    goles_v_previo = int(float(voto_previo['goles_visita'].values[0]))
+                    goles_l_previo = int(voto_previo['goles_local'].values[0])
+                    goles_v_previo = int(voto_previo['goles_visita'].values[0])
                     texto_boton = "Update Prediction"
 
             cod_local = banderas_img.get(nombre_local, "un")
@@ -158,24 +148,15 @@ if pagina == "Enter Predictions":
                 submit = st.form_submit_button(texto_boton)
                 
                 if submit:
-                    nueva_fila = pd.DataFrame([{
+                    # Usamos UPSERT: Inserta si no existe, o actualiza si ya existe la llave (usuario, match_id)
+                    data_insert = {
                         "usuario": usuario_actual,
                         "match_id": match_id,
                         "goles_local": goles_l,
-                        "goles_visita": goles_v,
-                        "fecha_ingreso": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }])
+                        "goles_visita": goles_v
+                    }
+                    supabase.table("predictions").upsert(data_insert).execute()
                     
-                    if not predicciones_existentes.empty:
-                        df_limpio = predicciones_existentes[
-                            ~((predicciones_existentes['usuario'] == usuario_actual) & 
-                              (predicciones_existentes['match_id'] == match_id))
-                        ]
-                        df_actualizado = pd.concat([df_limpio, nueva_fila], ignore_index=True)
-                    else:
-                        df_actualizado = nueva_fila
-
-                    conn_sheets.update(data=df_actualizado)
                     st.success("Prediction saved successfully! Reloading...")
                     st.rerun()
 
@@ -185,28 +166,27 @@ elif pagina == "Leaderboard":
     st.write("Points are calculated automatically based on the rules and stage multipliers.")
     
     try:
-        # TTL subido a 60 para proteger de caídas
-        df_votos = conn_sheets.read(ttl=60)
+        res_votos = supabase.table('predictions').select('*').execute()
+        df_votos = pd.DataFrame(res_votos.data)
+        
+        res_resultados = supabase.table('resultados_reales').select('*').execute()
+        df_resultados = pd.DataFrame(res_resultados.data)
     except:
         df_votos = pd.DataFrame()
-        
-    try:
-        df_resultados = conn_sheets.read(worksheet="resultados_reales", ttl=60)
-    except:
-        df_resultados = pd.DataFrame(columns=["match_id", "goles_local_real", "goles_visita_real"])
+        df_resultados = pd.DataFrame()
 
     if not df_votos.empty and not df_resultados.empty and 'match_id' in df_resultados.columns:
         
         df_votos['match_id'] = df_votos['match_id'].astype(str)
         df_resultados = df_resultados.dropna(subset=['match_id'])
-        df_resultados['match_id'] = df_resultados['match_id'].astype(float).astype(int).astype(str)
+        df_resultados['match_id'] = df_resultados['match_id'].astype(str)
         
         df_completo = pd.merge(df_votos, df_resultados, on="match_id", how="inner")
         
         if not df_completo.empty:
-            conn = sqlite3.connect('worldcup2026.db')
-            df_partidos = pd.read_sql_query("SELECT id as match_id, stage_id FROM matches", conn)
-            conn.close()
+            conn_db = sqlite3.connect('worldcup2026.db')
+            df_partidos = pd.read_sql_query("SELECT id as match_id, stage_id FROM matches", conn_db)
+            conn_db.close()
             
             df_partidos['match_id'] = df_partidos['match_id'].astype(str)
             df_completo = pd.merge(df_completo, df_partidos, on="match_id", how="left")
