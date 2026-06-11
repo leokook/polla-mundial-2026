@@ -28,13 +28,23 @@ def get_matches_db():
 
 
 # Sidebar menu
-st.sidebar.title("🏆 Office Pool 2026")
-pagina = st.sidebar.radio("Navigation", ["Enter Predictions", "View Predictions", "Leaderboard", "Rules & Scoring"])
+# --- INICIALIZAR MEMORIA GLOBAL ---
+# Ponemos esto antes del menú para que la app siempre sepa si hay alguien logeado o no
+if 'usuario_logeado' not in st.session_state:
+    st.session_state['usuario_logeado'] = None
 
-# ¡SI ERES TÚ, SE ACTIVA EL PANEL OCULTO! (Reemplaza 'Tu Nombre Exacto' por tu usuario)
-if st.session_state.get('usuario_logeado') == "Leonardo Guevara":
+# --- SIDEBAR MENU ---
+st.sidebar.title("🏆 Office Pool 2026")
+
+# 1. Definimos la variable opciones_menu (¡Esto arregla el NameError!)
+opciones_menu = ["Enter Predictions", "View Predictions", "Leaderboard", "Rules & Scoring"]
+
+# 2. Verificamos si el usuario actual es el Administrador
+# RECUERDA: Cambia "Tu Nombre Exacto" por tu usuario real de la base de datos
+if st.session_state['usuario_logeado'] == "Tu Nombre Exacto":
     opciones_menu.append("Admin Panel")
 
+# 3. Dibujamos el menú usando la variable que acabamos de crear
 pagina = st.sidebar.radio("Navigation", opciones_menu)
 
 banderas_img = {
