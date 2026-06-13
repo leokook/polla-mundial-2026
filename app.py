@@ -16,7 +16,7 @@ supabase = conn.client
 def get_matches_db():
     conn_db = sqlite3.connect('worldcup2026.db')
     query = '''
-        SELECT m.id, m.kickoff_at, t1.team_name as home, t2.team_name as away 
+        SELECT m.id, m.stage_id, m.kickoff_at, t1.team_name as home, t2.team_name as away 
         FROM matches m
         JOIN teams t1 ON m.home_team_id = t1.id
         JOIN teams t2 ON m.away_team_id = t2.id
