@@ -266,11 +266,11 @@ elif pagina == "Leaderboard":
 elif pagina == "View Predictions":
     st.title("👀 View Others' Predictions")
     st.write("Curious about what your colleagues predicted? Select a match below.")
-    st.info("🔒 **Anti-Cheat System:** To prevent copying, you can only view predictions for matches that are already locked (kickoff is less than 1 minute away).")
+    st.info("🔒 **Anti-Cheat System:** To prevent copying, you can only view predictions for matches that are already locked.")
 
     df_partidos = get_matches_db()
     
-    # Calcular la hora actual en Toronto para ser justos con los bloqueos
+    # Forzar la hora actual a la zona horaria de Toronto/Este
     ahora_toronto = pd.Timestamp.now('America/Toronto').to_pydatetime().replace(tzinfo=None)
     
     # Filtrar solo los partidos que ya pasaron su límite de modificación
@@ -282,7 +282,6 @@ elif pagina == "View Predictions":
     if df_bloqueados.empty:
         st.warning("No matches have been locked yet. Check back just before the first kickoff!")
     else:
-        # Crear un diccionario para el menú desplegable (Ej: "Mexico vs Canada - 2026-06-11")
         opciones_partidos = df_bloqueados.apply(lambda x: f"{x['home']} vs {x['away']} ({x['kickoff_at'][:10]})", axis=1).tolist()
         ids_partidos = df_bloqueados['id'].astype(str).tolist()
         diccionario_partidos = dict(zip(opciones_partidos, ids_partidos))
@@ -290,31 +289,70 @@ elif pagina == "View Predictions":
         partido_seleccionado = st.selectbox("Select a locked match:", opciones_partidos)
         match_id_seleccionado = diccionario_partidos[partido_seleccionado]
         
-        # Descargar de Supabase solo los votos de ese partido
+        # 1. Descargar los votos de ese partido
         try:
             res_votos = supabase.table('predictions').select('*').eq('match_id', match_id_seleccionado).execute()
             df_votos_partido = pd.DataFrame(res_votos.data)
         except:
             df_votos_partido = pd.DataFrame()
             
+        # 2. Descargar el resultado real (si ya existe)
+        try:
+            res_oficial = supabase.table('resultados_reales').select('*').eq('match_id', match_id_seleccionado).execute()
+            df_oficial = pd.DataFrame(res_oficial.data)
+        except:
+            df_oficial = pd.DataFrame()
+            
         if not df_votos_partido.empty:
-            # Obtener nombres de los equipos para las columnas
             equipo_local = df_bloqueados[df_bloqueados['id'].astype(str) == match_id_seleccionado]['home'].values[0]
             equipo_visita = df_bloqueados[df_bloqueados['id'].astype(str) == match_id_seleccionado]['away'].values[0]
+            stage_id = int(df_bloqueados[df_bloqueados['id'].astype(str) == match_id_seleccionado]['stage_id'].values[0])
             
-            # Limpiar y renombrar la tabla para que se vea profesional
-            df_votos_partido = df_votos_partido[['usuario', 'goles_local', 'goles_visita']]
-            df_votos_partido = df_votos_partido.rename(columns={
+            df_mostrar = df_votos_partido[['usuario', 'goles_local', 'goles_visita']].copy()
+            
+            # Si el partido ya terminó y tiene resultado oficial
+            if not df_oficial.empty:
+                gl_real = int(df_oficial['goles_local_real'].values[0])
+                gv_real = int(df_oficial['goles_visita_real'].values[0])
+                st.success(f"🏁 **Official Final Score:** {equipo_local} **{gl_real} - {gv_real}** {equipo_visita}")
+                
+                # Función para calcular los puntos exactos de este partido
+                def calcular_puntos_partido(row):
+                    pred_l, pred_v = int(row['goles_local']), int(row['goles_visita'])
+                    puntos_base = 0
+                    diff_pred = pred_l - pred_v
+                    diff_real = gl_real - gv_real
+                    
+                    if pred_l == gl_real and pred_v == gv_real:
+                        puntos_base = 5 
+                    else:
+                        acerto_ganador = (diff_pred > 0 and diff_real > 0) or \
+                                         (diff_pred < 0 and diff_real < 0) or \
+                                         (diff_pred == 0 and diff_real == 0)
+                        if acerto_ganador:
+                            puntos_base = 3
+                            if diff_pred == diff_real:
+                                puntos_base += 1 
+                    
+                    multiplicador = 1 if stage_id == 1 else (2 if stage_id in [2, 3, 4] else 3)
+                    return puntos_base * multiplicador
+
+                df_mostrar['🏆 Points Earned'] = df_mostrar.apply(calcular_puntos_partido, axis=1)
+                df_mostrar = df_mostrar.sort_values(by=['🏆 Points Earned', 'usuario'], ascending=[False, True])
+            
+            else:
+                st.info("⏳ Match in progress or pending results. Points will be calculated once the admin loads the final score.")
+                df_mostrar = df_mostrar.sort_values(by='usuario')
+                
+            # Renombrar columnas para la presentación
+            df_mostrar = df_mostrar.rename(columns={
                 'usuario': 'Player',
                 'goles_local': f'{equipo_local} Goals',
                 'goles_visita': f'{equipo_visita} Goals'
             })
             
-            # Ordenar alfabéticamente por jugador
-            df_votos_partido = df_votos_partido.sort_values(by='Player')
-            
-            st.dataframe(df_votos_partido, width='stretch', hide_index=True)
-            st.success(f"Showing {len(df_votos_partido)} predictions for this match.")
+            st.dataframe(df_mostrar, width='stretch', hide_index=True)
+            st.write(f"*Showing {len(df_mostrar)} predictions for this match.*")
         else:
             st.info("Nobody submitted a prediction for this match. 😱")
 
