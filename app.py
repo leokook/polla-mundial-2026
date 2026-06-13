@@ -254,7 +254,7 @@ elif pagina == "Leaderboard":
                 "Partidos_Acertados": "✅ Scoring Matches"
             })
             
-            st.dataframe(ranking, use_container_width=True, hide_index=True)
+            st.dataframe(ranking, width='stretch', hide_index=True)
             st.success("Leaderboard is up to date!")
             
         else:
@@ -313,7 +313,7 @@ elif pagina == "View Predictions":
             # Ordenar alfabéticamente por jugador
             df_votos_partido = df_votos_partido.sort_values(by='Player')
             
-            st.dataframe(df_votos_partido, use_container_width=True, hide_index=True)
+            st.dataframe(df_votos_partido, width='stretch', hide_index=True)
             st.success(f"Showing {len(df_votos_partido)} predictions for this match.")
         else:
             st.info("Nobody submitted a prediction for this match. 😱")
