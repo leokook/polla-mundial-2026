@@ -115,6 +115,22 @@ if pagina == "Enter Predictions":
             df_votos_usuario = pd.DataFrame()
 
         df_partidos = get_matches_db()
+
+        for index, row in df_partidos.iterrows():
+            match_id = str(row['id'])
+            nombre_local = row['home']
+            nombre_visita = row['away']
+            
+            # --- EL PARCHE RÁPIDO ---
+            fecha_str = row['kickoff_at'][:19]
+            
+            # Si es el partido modificado (ejemplo: ID 42), forzamos la nueva hora
+            if match_id == "31":  # <-- Cambia el 42 por el ID real del partido
+                fecha_str = "2026-06-19 20:30:00" # <-- Pon la nueva hora exacta aquí
+            # ------------------------
+            
+            # (El resto de tu código de fechas sigue igual abajo)
+            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
         
         for index, row in df_partidos.iterrows():
             match_id = str(row['id'])
@@ -278,6 +294,22 @@ elif pagina == "View Predictions":
     df_partidos['limite'] = df_partidos['kickoff_dt'] - timedelta(minutes=1)
     
     df_bloqueados = df_partidos[df_partidos['limite'] < ahora_toronto].copy()
+
+    for index, row in df_partidos.iterrows():
+            match_id = str(row['id'])
+            nombre_local = row['home']
+            nombre_visita = row['away']
+            
+            # --- EL PARCHE RÁPIDO ---
+            fecha_str = row['kickoff_at'][:19]
+            
+            # Si es el partido modificado (ejemplo: ID 42), forzamos la nueva hora
+            if match_id == "31":  # <-- Cambia el 42 por el ID real del partido
+                fecha_str = "2026-06-19 20:30:00" # <-- Pon la nueva hora exacta aquí
+            # ------------------------
+            
+            # (El resto de tu código de fechas sigue igual abajo)
+            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
     
     if df_bloqueados.empty:
         st.warning("No matches have been locked yet. Check back just before the first kickoff!")
