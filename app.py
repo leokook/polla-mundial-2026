@@ -197,46 +197,63 @@ if pagina == "Enter Predictions":
 elif pagina == "Leaderboard":
     st.title("📊 Official Leaderboard")
     st.write("Points are calculated automatically based on the rules and stage multipliers.")
-    
+
+    # --- Helper: trae TODAS las filas de una tabla (evita el límite oculto de 1000 de Supabase) ---
+    def traer_todo(tabla):
+        filas, paso, desde = [], 1000, 0
+        while True:
+            r = supabase.table(tabla).select('*').range(desde, desde + paso - 1).execute()
+            if not r.data:
+                break
+            filas.extend(r.data)
+            if len(r.data) < paso:
+                break
+            desde += paso
+        return pd.DataFrame(filas)
+
     try:
-        res_votos = supabase.table('predictions').select('*').execute()
-        df_votos = pd.DataFrame(res_votos.data)
-        
-        res_resultados = supabase.table('resultados_reales').select('*').execute()
-        df_resultados = pd.DataFrame(res_resultados.data)
-    except:
+        df_votos = traer_todo('predictions')
+        df_resultados = traer_todo('resultados_reales')
+    except Exception as e:
+        st.error("⚠️ Connection error while loading the leaderboard.")
         df_votos = pd.DataFrame()
         df_resultados = pd.DataFrame()
 
     if not df_votos.empty and not df_resultados.empty and 'match_id' in df_resultados.columns:
-        
-        df_votos['match_id'] = df_votos['match_id'].astype(str)
+
+        # Normalizamos match_id de forma robusta (str + sin espacios) en ambos lados
+        df_votos['match_id'] = df_votos['match_id'].astype(str).str.strip()
         df_resultados = df_resultados.dropna(subset=['match_id'])
-        df_resultados['match_id'] = df_resultados['match_id'].astype(str)
-        
+        df_resultados['match_id'] = df_resultados['match_id'].astype(str).str.strip()
+
         df_completo = pd.merge(df_votos, df_resultados, on="match_id", how="inner")
-        
+
         if not df_completo.empty:
             conn_db = sqlite3.connect('worldcup2026.db')
             df_partidos = pd.read_sql_query("SELECT id as match_id, stage_id FROM matches", conn_db)
             conn_db.close()
-            
-            df_partidos['match_id'] = df_partidos['match_id'].astype(str)
+
+            df_partidos['match_id'] = df_partidos['match_id'].astype(str).str.strip()
             df_completo = pd.merge(df_completo, df_partidos, on="match_id", how="left")
-            
+
             def calcular_puntos(row):
                 pred_l = int(row['goles_local'])
                 pred_v = int(row['goles_visita'])
                 real_l = int(row['goles_local_real'])
                 real_v = int(row['goles_visita_real'])
-                stage = int(row['stage_id'])
-                
+
+                # Si por algún motivo no encontró el stage, asumimos fase de grupos (x1)
+                try:
+                    stage = int(row['stage_id'])
+                except (ValueError, TypeError):
+                    stage = 1
+
                 puntos_base = 0
                 diff_pred = pred_l - pred_v
                 diff_real = real_l - real_v
-                
+
                 if pred_l == real_l and pred_v == real_v:
-                    puntos_base = 5 
+                    puntos_base = 5
                 else:
                     acerto_ganador = (diff_pred > 0 and diff_real > 0) or \
                                      (diff_pred < 0 and diff_real < 0) or \
@@ -244,35 +261,35 @@ elif pagina == "Leaderboard":
                     if acerto_ganador:
                         puntos_base = 3
                         if diff_pred == diff_real:
-                            puntos_base += 1 
-                
+                            puntos_base += 1
+
                 multiplicador = 1
-                if stage == 1:       
+                if stage == 1:
                     multiplicador = 1
-                elif stage in [2, 3, 4]: 
+                elif stage in [2, 3, 4]:
                     multiplicador = 2
-                elif stage in [5, 6, 7]: 
+                elif stage in [5, 6, 7]:
                     multiplicador = 3
-                    
+
                 return puntos_base * multiplicador
-            
+
             df_completo['Puntos Obtenidos'] = df_completo.apply(calcular_puntos, axis=1)
-            
+
             ranking = df_completo.groupby("usuario").agg(
                 Puntos_Totales=('Puntos Obtenidos', 'sum'),
                 Partidos_Acertados=('Puntos Obtenidos', lambda x: (x > 0).sum())
             ).reset_index()
-            
+
             ranking = ranking.sort_values(by=["Puntos_Totales", "Partidos_Acertados"], ascending=[False, False])
             ranking = ranking.rename(columns={
-                "usuario": "Player", 
+                "usuario": "Player",
                 "Puntos_Totales": "🏆 Total Points",
                 "Partidos_Acertados": "✅ Scoring Matches"
             })
-            
+
             st.dataframe(ranking, width='stretch', hide_index=True)
             st.success("Leaderboard is up to date!")
-            
+
         else:
             st.info("No predicted matches have been played yet.")
     else:
