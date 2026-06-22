@@ -499,7 +499,7 @@ elif pagina == "Admin Panel":
             
             # Guardar en Supabase usando UPSERT (crea o actualiza por llave primaria 'match_id')
             try:
-                supabase.table("resultados_reales").upsert(data_resultado).execute()
+                supabase.table("resultados_reales").upsert(data_resultado, on_conflict="match_id").execute()
                 st.success(f"🏆 Result for {partido_info['home']} {goles_local_real} - {goles_visita_real} {partido_info['away']} saved successfully!")
                 st.balloons() # ¡Efecto de globos para celebrar!
             except Exception as e:
