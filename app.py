@@ -115,83 +115,79 @@ if pagina == "Enter Predictions":
             df_votos_usuario = pd.DataFrame()
 
         df_partidos = get_matches_db()
-
-        for index, row in df_partidos.iterrows():
-            match_id = str(row['id'])
-            nombre_local = row['home']
-            nombre_visita = row['away']
-            
-            # --- EL PARCHE RÁPIDO ---
-            fecha_str = row['kickoff_at'][:19]
-            
-            # Si es el partido modificado (ejemplo: ID 42), forzamos la nueva hora
-            if match_id == "31":  # <-- Cambia el 42 por el ID real del partido
-                fecha_str = "2026-06-19 20:30:00" # <-- Pon la nueva hora exacta aquí
-            # ------------------------
-            
-            # (El resto de tu código de fechas sigue igual abajo)
-            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
         
-        for index, row in df_partidos.iterrows():
-            match_id = str(row['id'])
-            nombre_local = row['home']
-            nombre_visita = row['away']
-            fecha_str = row['kickoff_at'][:19]
-            fecha_partido = datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
-            
-            limite_modificacion = fecha_partido - timedelta(minutes=1)
-            
-            # Forzar la hora actual a la zona horaria de Toronto/Este
-            ahora_toronto = pd.Timestamp.now('America/Toronto').to_pydatetime().replace(tzinfo=None)
-            
-            if ahora_toronto > limite_modificacion:
-                st.warning(f"🔒 {nombre_local} vs {nombre_visita} - Match locked")
-                continue
-            
-            goles_l_previo = 0
-            goles_v_previo = 0
-            texto_boton = "Save Prediction"
-            
-            if not df_votos_usuario.empty:
-                voto_previo = df_votos_usuario[df_votos_usuario['match_id'] == match_id]
-                
-                if not voto_previo.empty:
-                    goles_l_previo = int(voto_previo['goles_local'].values[0])
-                    goles_v_previo = int(voto_previo['goles_visita'].values[0])
-                    texto_boton = "Update Prediction"
+        # 1. Identificar el tiempo actual
+        ahora_toronto = pd.Timestamp.now('America/Toronto').to_pydatetime().replace(tzinfo=None)
+        
+        # 2. Convertir fechas para poder filtrar la tabla entera
+        df_partidos['kickoff_dt'] = pd.to_datetime(df_partidos['kickoff_at'].str[:19])
+        df_partidos['limite'] = df_partidos['kickoff_dt'] - timedelta(minutes=1)
+        
+        # 3. Separar en dos grupos: Abiertos y Bloqueados
+        df_abiertos = df_partidos[df_partidos['limite'] >= ahora_toronto]
+        df_bloqueados = df_partidos[df_partidos['limite'] < ahora_toronto]
 
-            cod_local = banderas_img.get(nombre_local, "un")
-            cod_visita = banderas_img.get(nombre_visita, "un")
-            
-            html_local = f"<img src='https://flagcdn.com/24x18/{cod_local}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_local}</b>"
-            html_visita = f"<img src='https://flagcdn.com/24x18/{cod_visita}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_visita}</b>"
+        # --- MOSTRAR PARTIDOS ABIERTOS (Arriba) ---
+        st.subheader("🟢 Available for Prediction")
+        
+        if df_abiertos.empty:
+            st.success("🎉 All available matches have been predicted or locked! Wait for the next round.")
+        else:
+            for index, row in df_abiertos.iterrows():
+                match_id = str(row['id'])
+                nombre_local = row['home']
+                nombre_visita = row['away']
+                fecha_str = row['kickoff_at'][:19]
+                
+                goles_l_previo = 0
+                goles_v_previo = 0
+                texto_boton = "Save Prediction"
+                
+                if not df_votos_usuario.empty:
+                    voto_previo = df_votos_usuario[df_votos_usuario['match_id'] == match_id]
+                    if not voto_previo.empty:
+                        goles_l_previo = int(voto_previo['goles_local'].values[0])
+                        goles_v_previo = int(voto_previo['goles_visita'].values[0])
+                        texto_boton = "Update Prediction"
 
-            with st.form(key=f"form_{match_id}"):
-                st.write(f"📅 Kickoff: **{fecha_str}**")
-                col1, col2, col3 = st.columns([2, 1, 2])
-                with col1:
-                    st.markdown(html_local, unsafe_allow_html=True)
-                    goles_l = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
-                with col2:
-                    st.write("VS")
-                with col3:
-                    st.markdown(html_visita, unsafe_allow_html=True)
-                    goles_v = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
+                cod_local = banderas_img.get(nombre_local, "un")
+                cod_visita = banderas_img.get(nombre_visita, "un")
                 
-                submit = st.form_submit_button(texto_boton)
-                
-                if submit:
-                    # Usamos UPSERT: Inserta si no existe, o actualiza si ya existe la llave (usuario, match_id)
-                    data_insert = {
-                        "usuario": usuario_actual,
-                        "match_id": match_id,
-                        "goles_local": goles_l,
-                        "goles_visita": goles_v
-                    }
-                    supabase.table("predictions").upsert(data_insert, on_conflict="usuario,match_id").execute()
+                html_local = f"<img src='https://flagcdn.com/24x18/{cod_local}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_local}</b>"
+                html_visita = f"<img src='https://flagcdn.com/24x18/{cod_visita}.png' style='vertical-align: middle; margin-right: 8px;'> <b>{nombre_visita}</b>"
+
+                with st.form(key=f"form_{match_id}"):
+                    st.write(f"📅 Kickoff: **{fecha_str}**")
+                    col1, col2, col3 = st.columns([2, 1, 2])
+                    with col1:
+                        st.markdown(html_local, unsafe_allow_html=True)
+                        goles_l = st.number_input("Goals", min_value=0, step=1, value=goles_l_previo, key=f"gl_{match_id}")
+                    with col2:
+                        st.write("VS")
+                    with col3:
+                        st.markdown(html_visita, unsafe_allow_html=True)
+                        goles_v = st.number_input("Goals", min_value=0, step=1, value=goles_v_previo, key=f"gv_{match_id}")
                     
-                    st.success("Prediction saved successfully! Reloading...")
-                    st.rerun()
+                    submit = st.form_submit_button(texto_boton)
+                    
+                    if submit:
+                        data_insert = {
+                            "usuario": usuario_actual,
+                            "match_id": match_id,
+                            "goles_local": goles_l,
+                            "goles_visita": goles_v
+                        }
+                        supabase.table("predictions").upsert(data_insert, on_conflict="usuario,match_id").execute()
+                        st.success("Prediction saved successfully! Reloading...")
+                        st.rerun()
+
+        # --- MOSTRAR PARTIDOS BLOQUEADOS (Al final, colapsados) ---
+        if not df_bloqueados.empty:
+            st.write("---")
+            with st.expander(f"🔒 View Locked Matches ({len(df_bloqueados)})"):
+                st.write("These matches have already started or finished. Predictions are sealed.")
+                for index, row in df_bloqueados.iterrows():
+                    st.warning(f"🔒 {row['home']} vs {row['away']} - Locked ({row['kickoff_at'][:10]})")
 
 # --- PAGE 2: LEADERBOARD ---
 elif pagina == "Leaderboard":
