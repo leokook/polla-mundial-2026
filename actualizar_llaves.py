@@ -61,7 +61,7 @@ if __name__ == "__main__":
     actualizar_partido(90, "Canada", "Morocco")
     actualizar_partido(91, "Brazil", "Norway")
     actualizar_partido(92, "Mexico", "England")
-    #actualizar_partido(93, "yyyyy", "xxx")
+    actualizar_partido(93, "Portugal", "Spain")
     actualizar_partido(94, "USA", "Belgium")
     #actualizar_partido(95, "yyyyy", "xxx")
     #actualizar_partido(96, "yyyyy", "xxx")
